@@ -42,6 +42,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 using namespace System;
 using namespace System::Collections;
 using namespace System::Collections::Generic;
+using namespace System::Runtime::InteropServices;
 
 namespace SketchUpNET
 {
@@ -143,6 +144,28 @@ namespace SketchUpNET
 			}
 
 			return groups;
+		}
+
+		SUGroupRef ToSU()
+		{
+			SUGroupRef group = SU_INVALID;
+			SUGroupCreate(&group);
+			const char* name = (const char*)(void*)
+				Marshal::StringToHGlobalUni(this->Name);
+			const char* guid = (const char*)(void*)
+				Marshal::StringToHGlobalUni(this->Guid);
+			SUGroupSetName(group, name);
+			SUGroupSetGuid(group, guid);
+
+			SUEntitiesRef entities = SU_INVALID;
+			SUGroupGetEntities(group, &entities);
+			SUEntitiesAddFaces(entities, Surfaces->Count, Surface::ListToSU(Surfaces));
+			SUEntitiesAddEdges(entities, Edges->Count, Edge::ListToSU(Edges));
+			SUEntitiesAddCurves(entities, Curves->Count, Curve::ListToSU(Curves));
+
+			Marshal::FreeHGlobal(IntPtr((void*)name));
+			Marshal::FreeHGlobal(IntPtr((void*)guid));
+			return group;
 		}
 	};
 

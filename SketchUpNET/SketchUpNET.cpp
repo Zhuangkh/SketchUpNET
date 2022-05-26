@@ -101,7 +101,7 @@ namespace SketchUpNET
 		/// <summary>
 		/// Containing Model Curves (Arcs)
 		/// </summary>
-		System::Collections::Generic::List<Curve^>^ Curves; 
+		System::Collections::Generic::List<Curve^>^ Curves;
 
 		/// <summary>
 		/// Containing Model Edges (Lines)
@@ -138,7 +138,7 @@ namespace SketchUpNET
 			SUModelRef model = SU_INVALID;
 			SUModelLoadStatus status;
 			SUModelCreateFromFileWithStatus(&model, path, &status);
-			
+
 
 			if (status == SUModelLoadStatus_Success_MoreRecent)
 				MoreRecentFileVersion = true;
@@ -148,7 +148,7 @@ namespace SketchUpNET
 
 			Layers = gcnew System::Collections::Generic::List<Layer^>();
 			Groups = gcnew System::Collections::Generic::List<Group^>();
-			Components = gcnew System::Collections::Generic::Dictionary<String^,Component^>();
+			Components = gcnew System::Collections::Generic::Dictionary<String^, Component^>();
 			Materials = gcnew System::Collections::Generic::Dictionary<String^, Material^>();
 
 			SUEntitiesRef entities = SU_INVALID;
@@ -168,7 +168,7 @@ namespace SketchUpNET
 						Materials->Add(mat->Name, mat);
 				}
 			}
-			
+
 			//Get All Layers
 			size_t layerCount = 0;
 			SUModelGetNumLayers(model, &layerCount);
@@ -295,16 +295,10 @@ namespace SketchUpNET
 			else
 				MoreRecentFileVersion = false;
 
-
-			SUEntitiesRef entities = SU_INVALID;
-			SUModelGetEntities(model, &entities);
-
-			SUEntitiesAddFaces(entities, Surfaces->Count, Surface::ListToSU(Surfaces));
-			SUEntitiesAddEdges(entities, Edges->Count, Edge::ListToSU(Edges));
-			SUEntitiesAddCurves(entities, Curves->Count, Curve::ListToSU(Curves));
+			WriteToModel(model);
 
 			SUModelSaveToFile(model, Utilities::ToString(filename));
-			
+
 			SUModelRelease(&model);
 			SUTerminate();
 			return true;
@@ -335,14 +329,8 @@ namespace SketchUpNET
 
 			if (res != SU_ERROR_NONE) return false;
 
+			WriteToModel(model);
 
-			SUEntitiesRef entities = SU_INVALID;
-			SUModelGetEntities(model, &entities);
-
-			SUEntitiesAddFaces(entities, Surfaces->Count, Surface::ListToSU(Surfaces));
-			SUEntitiesAddEdges(entities, Edges->Count, Edge::ListToSU(Edges));
-			SUEntitiesAddCurves(entities, Curves->Count, Curve::ListToSU(Curves));
-			
 			SUModelVersion v = ToSUVersion(version);
 			SUModelSaveToFileWithVersion(model, Utilities::ToString(filename), v);
 			SUModelRelease(&model);
@@ -351,62 +339,74 @@ namespace SketchUpNET
 			return true;
 		}
 
-		private:
+	private:
 
-			SUModelVersion ToSUVersion(SketchUpNET::SKPVersion version) {
-				switch (version) {
-				case SketchUpNET::SKPVersion::V2013:
-					return SUModelVersion::SUModelVersion_SU2013;
-				case SketchUpNET::SKPVersion::V2014:
-					return SUModelVersion::SUModelVersion_SU2014;
-				case SketchUpNET::SKPVersion::V2015:
-					return SUModelVersion::SUModelVersion_SU2015;
-				case SketchUpNET::SKPVersion::V2016:
-					return SUModelVersion::SUModelVersion_SU2016;
-				case SketchUpNET::SKPVersion::V2017:
-					return SUModelVersion::SUModelVersion_SU2017;
-				case SketchUpNET::SKPVersion::V2018:
-					return SUModelVersion::SUModelVersion_SU2018;
-				case SketchUpNET::SKPVersion::V2019:
-					return SUModelVersion::SUModelVersion_SU2019;
-				case SketchUpNET::SKPVersion::V2020:
-					return SUModelVersion::SUModelVersion_SU2020;
-				case SketchUpNET::SKPVersion::V2021:
-					return SUModelVersion::SUModelVersion_SU2021;
-				default:
-					return SUModelVersion::SUModelVersion_SU2021;
-				}
+		SUModelVersion ToSUVersion(SketchUpNET::SKPVersion version) {
+			switch (version) {
+			case SketchUpNET::SKPVersion::V2013:
+				return SUModelVersion::SUModelVersion_SU2013;
+			case SketchUpNET::SKPVersion::V2014:
+				return SUModelVersion::SUModelVersion_SU2014;
+			case SketchUpNET::SKPVersion::V2015:
+				return SUModelVersion::SUModelVersion_SU2015;
+			case SketchUpNET::SKPVersion::V2016:
+				return SUModelVersion::SUModelVersion_SU2016;
+			case SketchUpNET::SKPVersion::V2017:
+				return SUModelVersion::SUModelVersion_SU2017;
+			case SketchUpNET::SKPVersion::V2018:
+				return SUModelVersion::SUModelVersion_SU2018;
+			case SketchUpNET::SKPVersion::V2019:
+				return SUModelVersion::SUModelVersion_SU2019;
+			case SketchUpNET::SKPVersion::V2020:
+				return SUModelVersion::SUModelVersion_SU2020;
+			case SketchUpNET::SKPVersion::V2021:
+				return SUModelVersion::SUModelVersion_SU2021;
+			default:
+				return SUModelVersion::SUModelVersion_SU2021;
 			}
+		}
 
-			void FixRefs(Component^ comp)
+		void FixRefs(Component^ comp)
+		{
+			for each (Instance^ var in comp->Instances)
 			{
-				for each (Instance^ var in comp->Instances)
+				if (Components->ContainsKey(var->ParentID))
 				{
-					if (Components->ContainsKey(var->ParentID))
-					{
-						System::Object^ o = Components[var->ParentID];
-						var->Parent = o;
+					System::Object^ o = Components[var->ParentID];
+					var->Parent = o;
 
-						FixRefs(Components[var->ParentID]);
-					}
+					FixRefs(Components[var->ParentID]);
 				}
 			}
+		}
 
-			void FixRefs(Group^ comp)
+		void FixRefs(Group^ comp)
+		{
+			for each (Instance^ var in comp->Instances)
 			{
-				for each (Instance^ var in comp->Instances)
+				if (Components->ContainsKey(var->ParentID))
 				{
-					if (Components->ContainsKey(var->ParentID))
-					{
-						System::Object^ o = Components[var->ParentID];
-						var->Parent = o;
+					System::Object^ o = Components[var->ParentID];
+					var->Parent = o;
 
-						FixRefs(Components[var->ParentID]);
-					}
+					FixRefs(Components[var->ParentID]);
 				}
 			}
+		}
 
+		void WriteToModel(SUModelRef model) {
+			SUEntitiesRef entities = SU_INVALID;
+			SUModelGetEntities(model, &entities);
 
+			SUEntitiesAddFaces(entities, Surfaces->Count, Surface::ListToSU(Surfaces));
+			SUEntitiesAddEdges(entities, Edges->Count, Edge::ListToSU(Edges));
+			SUEntitiesAddCurves(entities, Curves->Count, Curve::ListToSU(Curves));
+
+			for (int i = 0, ic = Groups->Count; i < ic; i++)
+			{
+				SUEntitiesAddGroup(entities, Groups[i]->Group::ToSU());
+			}
+		}
 	};
 
 
