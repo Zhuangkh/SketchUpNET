@@ -103,13 +103,13 @@ namespace SketchUpNET
 
 			SUTransformation transform = SU_INVALID;
 			SUGroupGetTransform(group, &transform);
-			
+
 			List<Surface^>^ surfaces = Surface::GetEntitySurfaces(entities, includeMeshes, materials);
 			List<Edge^>^ edges = Edge::GetEntityEdges(entities);
 			List<Curve^>^ curves = Curve::GetEntityCurves(entities);
 			List<Instance^>^ inst = Instance::GetEntityInstances(entities, materials);
 			List<Group^>^ grps = Group::GetEntityGroups(entities, includeMeshes, materials);
-			
+
 			// Layer
 			SULayerRef layer = SU_INVALID;
 			SUDrawingElementGetLayer(SUGroupToDrawingElement(group), &layer);
@@ -144,28 +144,6 @@ namespace SketchUpNET
 			}
 
 			return groups;
-		}
-
-		SUGroupRef ToSU()
-		{
-			SUGroupRef group = SU_INVALID;
-			SUGroupCreate(&group);
-			const char* name = (const char*)(void*)
-				Marshal::StringToHGlobalUni(this->Name);
-			const char* guid = (const char*)(void*)
-				Marshal::StringToHGlobalUni(this->Guid);
-			SUGroupSetName(group, name);
-			SUGroupSetGuid(group, guid);
-
-			SUEntitiesRef entities = SU_INVALID;
-			SUGroupGetEntities(group, &entities);
-			SUEntitiesAddFaces(entities, Surfaces->Count, Surface::ListToSU(Surfaces));
-			SUEntitiesAddEdges(entities, Edges->Count, Edge::ListToSU(Edges));
-			SUEntitiesAddCurves(entities, Curves->Count, Curve::ListToSU(Curves));
-
-			Marshal::FreeHGlobal(IntPtr((void*)name));
-			Marshal::FreeHGlobal(IntPtr((void*)guid));
-			return group;
 		}
 	};
 

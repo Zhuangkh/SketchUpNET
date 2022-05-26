@@ -101,6 +101,14 @@ namespace SketchUpNET
 
 		};
 
+		SUTransformation ToSU() {
+			SUTransformation transform;
+			for (int i = 0; i < 16; i++)
+			{
+				transform.values[i] = Data[i];
+			}
+			return transform;
+		}
 	};
 
 

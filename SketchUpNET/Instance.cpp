@@ -41,6 +41,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 using namespace System;
 using namespace System::Collections;
 using namespace System::Collections::Generic;
+using namespace System::Runtime::InteropServices;
 
 namespace SketchUpNET
 {
@@ -138,6 +139,22 @@ namespace SketchUpNET
 			}
 
 			return instancelist;
+		}
+
+		SUComponentInstanceRef ToSU(SUComponentDefinitionRef ref) {
+			SUComponentInstanceRef instance = SU_INVALID;
+			SUComponentDefinitionCreateInstance(ref, &instance);
+			const char* name = (const char*)(void*)
+				Marshal::StringToHGlobalUni(this->Name);
+			const char* guid = (const char*)(void*)
+				Marshal::StringToHGlobalUni(this->Guid);
+			SUComponentInstanceSetName(instance,name);
+			SUComponentInstanceSetGuid(instance,guid);
+			SUComponentInstanceSetTransform(instance,&this->Transformation->ToSU());
+
+			Marshal::FreeHGlobal(IntPtr((void*)name));
+			Marshal::FreeHGlobal(IntPtr((void*)guid));
+			return instance;
 		}
 	};
 

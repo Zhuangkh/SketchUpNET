@@ -402,10 +402,23 @@ namespace SketchUpNET
 			SUEntitiesAddEdges(entities, Edges->Count, Edge::ListToSU(Edges));
 			SUEntitiesAddCurves(entities, Curves->Count, Curve::ListToSU(Curves));
 
+			for each (Component ^ comp in Components->Values)
+			{
+				FixRefs(comp);
+			}
 			for (int i = 0, ic = Groups->Count; i < ic; i++)
 			{
-				SUEntitiesAddGroup(entities, Groups[i]->Group::ToSU());
+				FixRefs(Groups[i]);
 			}
+
+			List<Component^>^ compList = gcnew List<Component^>(Components->Values);
+			SUComponentDefinitionRef* refList = Component::ListToSU(compList);
+			SUModelAddComponentDefinitions(model, compList->Count, refList);
+			for (int i = 0, ic = Groups->Count; i < ic; i++)
+			{
+				SUEntitiesAddGroup(entities, Component::GroupToSU(Groups[i],compList, refList));
+			}
+
 		}
 	};
 

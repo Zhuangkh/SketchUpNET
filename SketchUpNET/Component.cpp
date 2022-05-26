@@ -44,6 +44,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 using namespace System;
 using namespace System::Collections;
 using namespace System::Collections::Generic;
+using namespace System::Linq;
 
 namespace SketchUpNET
 {
@@ -71,7 +72,7 @@ namespace SketchUpNET
 			this->Groups = groups;
 		};
 
-		Component(){};
+		Component() {};
 	internal:
 		static Component^ FromSU(SUComponentDefinitionRef comp, bool includeMeshes, System::Collections::Generic::Dictionary<String^, Material^>^ materials)
 		{
@@ -88,8 +89,8 @@ namespace SketchUpNET
 
 			size_t faceCount = 0;
 			SUEntitiesGetNumFaces(entities, &faceCount);
-			
-			
+
+
 			SUStringRef guid = SU_INVALID;
 			SUStringCreate(&guid);
 			SUComponentDefinitionGetGuid(comp, &guid);
@@ -99,14 +100,103 @@ namespace SketchUpNET
 			List<Edge^>^ edges = Edge::GetEntityEdges(entities);
 			List<Instance^>^ instances = Instance::GetEntityInstances(entities, materials);
 			List<Group^>^ grps = Group::GetEntityGroups(entities, includeMeshes, materials);
-			
-			
 
-			Component^ v = gcnew Component(Utilities::GetString(name), Utilities::GetString(guid), surfaces, curves, edges,instances, Utilities::GetString(desc), grps);
+
+
+			Component^ v = gcnew Component(Utilities::GetString(name), Utilities::GetString(guid), surfaces, curves, edges, instances, Utilities::GetString(desc), grps);
 
 			return v;
 		};
 
+		SUComponentDefinitionRef ToSU(List<Component^>^ list, SUComponentDefinitionRef* refList) {
+			SUComponentDefinitionRef component = SU_INVALID;
+			SUComponentDefinitionCreate(&component);
+
+			const char* name = (const char*)(void*)
+				Marshal::StringToHGlobalUni(this->Name);
+			const char* desc = (const char*)(void*)
+				Marshal::StringToHGlobalUni(this->Description);
+			SUComponentDefinitionSetName(component, name);
+			SUComponentDefinitionSetDescription(component, desc);
+
+			SUEntitiesRef entities = SU_INVALID;
+			SUComponentDefinitionGetEntities(component, &entities);
+			SUEntitiesAddFaces(entities, Surfaces->Count, Surface::ListToSU(Surfaces));
+			SUEntitiesAddEdges(entities, Edges->Count, Edge::ListToSU(Edges));
+			SUEntitiesAddCurves(entities, Curves->Count, Curve::ListToSU(Curves));
+			for (int i = 0, ic = Groups->Count; i < ic; i++)
+			{
+				SUEntitiesAddGroup(entities, GroupToSU(Groups[i], list, refList));
+			}
+
+			for (int i = 0, ic = Instances->Count; i < ic; i++)
+			{
+				int index = list->IndexOf((Component^)Instances[i]->Parent);
+				if (index != -1)
+				{
+					SUComponentInstanceRef insRef = Instances[i]->Instance::ToSU(refList[index]);
+					SUStringRef guid = SU_INVALID;
+					SUStringCreate(&guid);
+					SUComponentInstanceGetGuid(insRef, &guid);
+					SUEntitiesAddInstance(entities, insRef, &guid);
+				}
+			}
+			Marshal::FreeHGlobal(IntPtr((void*)name));
+			Marshal::FreeHGlobal(IntPtr((void*)desc));
+			return component;
+		}
+
+		static SUComponentDefinitionRef* ListToSU(List<Component^>^ list)
+		{
+			size_t size = list->Count;
+			SUComponentDefinitionRef* result = (SUComponentDefinitionRef*)malloc(*&size * sizeof(SUComponentDefinitionRef));
+			for (int i = 0; i < size; i++)
+			{
+				result[i] = list[i]->ToSU(list, result);
+			}
+			return result;
+		}
+
+		static SUGroupRef GroupToSU(Group^ group, System::Collections::Generic::List<Component^>^ list, SUComponentDefinitionRef* refList)
+		{
+			SUGroupRef groupRef = SU_INVALID;
+			SUGroupCreate(&groupRef);
+			const char* name = (const char*)(void*)
+				Marshal::StringToHGlobalUni(group->Name);
+			const char* guid = (const char*)(void*)
+				Marshal::StringToHGlobalUni(group->Guid);
+			SUGroupSetName(groupRef, name);
+			SUGroupSetGuid(groupRef, guid);
+
+			SUEntitiesRef entities = SU_INVALID;
+			SUGroupGetEntities(groupRef, &entities);
+			SUEntitiesAddFaces(entities, group->Surfaces->Count, Surface::ListToSU(group->Surfaces));
+			SUEntitiesAddEdges(entities, group->Edges->Count, Edge::ListToSU(group->Edges));
+			SUEntitiesAddCurves(entities, group->Curves->Count, Curve::ListToSU(group->Curves));
+			for (int i = 0, ic = group->Groups->Count; i < ic; i++)
+			{
+				SUEntitiesAddGroup(entities, GroupToSU(group->Groups[i], list, refList));
+			}
+
+			for (int i = 0, ic = group->Instances->Count; i < ic; i++)
+			{
+				int index = list->IndexOf((Component^)group->Instances[i]->Parent);
+				if (index != -1)
+				{
+					SUComponentInstanceRef insRef = group->Instances[i]->Instance::ToSU(refList[index]);
+					SUStringRef guid = SU_INVALID;
+					SUStringCreate(&guid);
+					SUComponentInstanceGetGuid(insRef, &guid);
+					SUEntitiesAddInstance(entities, insRef, &guid);
+				}
+			}
+
+			SUGroupSetTransform(groupRef, &group->Transformation->ToSU());
+
+			Marshal::FreeHGlobal(IntPtr((void*)name));
+			Marshal::FreeHGlobal(IntPtr((void*)guid));
+			return groupRef;
+		}
 	};
 
 
